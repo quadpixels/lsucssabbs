@@ -71,7 +71,7 @@
 
 from PyQt4 import Qt, QtCore, QtGui, uic
 from PIL import ExifTags
-import sys, os, datetime, imaplib, email, email.header, email.generator, email.parser, time
+import sys, os, datetime, imaplib, email, email.header, email.generator, email.parser, time, codecs
 import analyze
 import MySQLdb, ftplib, re, pdb, pytz
 import pickle
@@ -676,6 +676,7 @@ class MyApp(QtGui.QMainWindow, Ui_MainWindow):
 		self.btn_match_old_content_with_db.clicked.connect(self.MatchOldContentWithDB)
 		self.btn_match_old_content_with_db_writedb.clicked.connect(self.WriteUpgradedContentToDB);
 		self.btn_renew_tags.clicked.connect(self.RenewTags);
+		self.btn_dump_tag_nodeid.clicked.connect(self.DumpTagNodeID);
 
 		self.m2v_disk = dict() # Mail to View.
 		self.m2v_db   = dict() 
@@ -1972,7 +1973,8 @@ class MyApp(QtGui.QMainWindow, Ui_MainWindow):
 		else:
 			tids = [int(xx) for xx in x.split(",")]
 		all_keywords = set([])
-		max_kwid = max([x[0] for x in self.db_tags.values()])
+		if len(self.db_tags) < 1: max_kwid = 0
+		else: max_kwid = max([x[0] for x in self.db_tags.values()])
 		kwfreqs = dict()
 		updated_tids = set([])
 		new_tr_entries = []
@@ -2050,7 +2052,32 @@ class MyApp(QtGui.QMainWindow, Ui_MainWindow):
 			sql_update_tag_topic_side += " ELSE keywords END;"
 		else:
 			sql_update_tag_topic_side = ""
+		self.plaintext_sql_special.setPlainText(sql_update_tag_topic_side);
 		print sql_update_tag_topic_side
+		
+	def DumpTagNodeID(self):
+		fn = "tags_to_nodeid.txt"
+		f_out = codecs.open(fn, "w", encoding="utf-8");
+		x = str(self.lineedit_renewtag_topicids.text());
+		if x.lower() == "all": tids = self.topicid_to_topic.keys()
+		else: tids = [int(xx) for xx in x.split(",")]
+		print " "
+		n = 0
+		is_ignore_uncategorized = self.cb_ignore_uncategorized.isChecked()
+		for idx, tid in enumerate(tids):
+			sys.stdout.write("%d / %d                   \r" % (idx+1, len(tids)))
+			assert self.topicid_to_topic.has_key(tid)
+			m = self.topicid_to_topic[tid]
+			if is_ignore_uncategorized and analyze.NodeIDToNodeName(m.node_id)=="未归类" : continue
+			keywords = jieba.analyse.textrank(m.subject + m.content)
+			if (m.keywords is None): m.keywords = set([])
+			titlecut = jieba.cut(m.subject)
+			titlecut1= jieba.cut(m.subject, cut_all=True)
+			f_out.write(u"%d, %d, [%s], [%s]" % (tid, m.node_id, "/".join(titlecut), "/".join(titlecut1)))
+			f_out.write("\n");
+			n += 1
+		print "\nOK! %d data points. File written to %s             " % (n, fn)
+		f_out.close()
 	
 def ParseCmdArgs(argv1):
 	global g_configs, SEP
