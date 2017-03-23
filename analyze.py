@@ -34,6 +34,7 @@
 # 2016-06-21: 修理「在pickle中看到了一个新用户」的情况，使得传给 main.py 的 g_email_to_user 能正常使用。
 # 2016-08-23: 添加结巴分词，用来做分词，使搜索功能能够使用
 # 2016-09-13: 修改附件的命名方式，把日期部分移去
+# 2017-03-20: Classification using Random Forest
 
 import email, os, sys, re, pdb, shutil
 import email.header
@@ -46,6 +47,8 @@ import md5, imghdr, Image, base64, pytz
 import pickle
 from PIL import ExifTags
 import jieba.analyse
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.ensemble import RandomForestClassifier
 
 BOT_SIGNATURE = U"[Mailing List Bot]（无主题）"
 FLAG_FROM_MAILING_LIST = 0x01
@@ -321,7 +324,11 @@ NODE_NAME_AND_ID = [("未归类", 6),
  ("体育活动", 13),
  ("找帮手", 14),
  ("Carpool", 15),
- ("纠纷／问题处理", 16)
+ ("纠纷／解惑／办事", 16),
+ ("亲子育儿", 17),
+ ("Family Plan／Coupon／保险", 18),
+ ("学习研究", 20),
+ ("信仰", 21)
 ]
 
 # 以下这两项对于主帖与回复皆适用
@@ -385,9 +392,33 @@ def ClassifySubject(subject):
 		if u"音乐节" in subject: return 12
 		if u"晚会" in subject or u"春晚" in subject: return 12
 		if "recital" in subject_l: return 12
-	
 	return 6
+
+g_forest = None; g_vectorizer = None
+def Classify(subject, content):
+	global g_forest, g_vectorizer
+	if g_forest is None:
+		f = open("/home/nitroglycerine/kaggle/temp/mail_forest.pickle", "r")
+		g_forest = pickle.load(f)
+		f.close();
+	if g_vectorizer is None:
+		f = open("/home/nitroglycerine/kaggle/temp/mail_vectorizer.pickle", "r")
+		g_vectorizer = pickle.load(f)
+		f.close()
 	
+	# 现在就先只用标题，不用内容	
+	#cut1 = jieba.cut(subject + content, cut_all=True)
+	cut1 = jieba.cut(subject, cut_all = True)
+	
+	x = []
+	for y in cut1:
+		if y != "" and y!="\n": x.append(y)
+	x = " ".join(x)
+	#print "x =",x
+	bow_array = g_vectorizer.transform([x]).toarray()
+	result = g_forest.predict(bow_array)
+	node_id = result[0]
+	return node_id
 
 g_stb_comment_id   = 0; # 当前的
 g_stb_topic_id     = 0;
@@ -1010,7 +1041,7 @@ def AnalyzeOneEmail(fn):
 	else:
 		is_valid = False;
 
-	nodeid = ClassifySubject(subj)
+	#nodeid = ClassifySubject(subj)
 	
 	attachments = []
 	image_idx = [0]
@@ -1200,6 +1231,8 @@ def AnalyzeOneEmail(fn):
 		if len(not_inlined_attachments) > 0:
 			flag_att = 4
 		
+		nodeid = Classify(subj, allcontent_plain)
+		
 		m = Message(sender, subj, allcontent, dt, 
 			not_inlined_attachments, -999, 
 			FLAG_FROM_MAILING_LIST | flag_html | flag_att)
@@ -1215,13 +1248,13 @@ def AnalyzeOneEmail(fn):
 		if g_sender_count.has_key(sender_email) == False:
 			g_sender_count[sender_email] = 0
 		g_sender_count[sender_email] += 1
-	
 	if DEBUG:
 		print "===========DEBUG==========="
 		print "Subject     :", subj
 		print "Sender Name :", sender_name 
 		print "Email       :", sender_email
 		print "Date        :", dt
+		print "分类 Node ID :", nodeid
 
 	f.close()
 

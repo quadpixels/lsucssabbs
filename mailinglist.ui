@@ -1059,7 +1059,7 @@
       </rect>
      </property>
      <property name="currentIndex">
-      <number>4</number>
+      <number>2</number>
      </property>
      <widget class="QWidget" name="tab_5">
       <attribute name="title">
@@ -1275,7 +1275,7 @@
         <rect>
          <x>10</x>
          <y>10</y>
-         <width>71</width>
+         <width>61</width>
          <height>81</height>
         </rect>
        </property>
@@ -1287,7 +1287,7 @@
       <widget class="QPushButton" name="btn_update_nodeid">
        <property name="geometry">
         <rect>
-         <x>10</x>
+         <x>410</x>
          <y>100</y>
          <width>111</width>
          <height>31</height>
@@ -1298,6 +1298,19 @@
        </property>
        <property name="text">
         <string>ＦＩＲＥ</string>
+       </property>
+      </widget>
+      <widget class="QCheckBox" name="cb_only_uncategorized">
+       <property name="geometry">
+        <rect>
+         <x>10</x>
+         <y>100</y>
+         <width>151</width>
+         <height>24</height>
+        </rect>
+       </property>
+       <property name="text">
+        <string>只处理“未分类”的</string>
        </property>
       </widget>
      </widget>
@@ -2790,7 +2803,7 @@
      <x>0</x>
      <y>0</y>
      <width>1126</width>
-     <height>30</height>
+     <height>29</height>
     </rect>
    </property>
   </widget>

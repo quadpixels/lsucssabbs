@@ -68,6 +68,7 @@
 # 2016-07-09: 文件名太长，截断之
 # 2016-07-16: WPChina空间拒绝SFTP连接，先暂时换成不加密的FTP。
 # 2016-12-24: 容量超出，不得不删除一些巨占空间的回复，而这也造成了数据不一致性，需要处理这些情况
+# 2017-03-21: Classify routine connected to ``classify'' button
 
 from PyQt4 import Qt, QtCore, QtGui, uic
 from PIL import ExifTags
@@ -76,6 +77,7 @@ import analyze
 import MySQLdb, ftplib, re, pdb, pytz
 import pickle
 import jieba.analyse
+from bs4 import BeautifulSoup
 
 g_configs = dict()
 g_lastsave = dict()
@@ -1751,16 +1753,26 @@ class MyApp(QtGui.QMainWindow, Ui_MainWindow):
 		self.plaintext_attachment_index_status.setPlainText("Done");
 	
 	def ClassifyDBMessages(self):
+		nodeid_uncategorized = analyze.NodeNameToNodeID("未归类")
+		is_uncategorized_only = self.cb_only_uncategorized.isChecked()
 		sql = ""
 		nnid = 0
-		for m in self.db_messages:
-			new_nodeid = analyze.ClassifySubject(m.subject)
+		for idx, m in enumerate(self.db_messages):
+			sys.stdout.write("\r%d / %d     " % (idx+1, len(self.db_messages)))
+			sys.stdout.flush()
+			if is_uncategorized_only:
+				if m.node_id != nodeid_uncategorized:
+					continue
+			soup = BeautifulSoup(m.content, "html.parser")
+			parsed = soup.get_text().strip()
+			new_nodeid = analyze.Classify(m.subject, parsed)
 			if new_nodeid != m.node_id:
 				if sql == "":
 					sql = "UPDATE stb_topics SET node_id = CASE"
 				sql = sql + " WHEN topic_id = %d THEN %d" % (m.primary_key, new_nodeid)
 				nnid = nnid + 1
 		sql = sql + " ELSE node_id END; "
+		print
 		self.plaintext_nodeid_sql.setPlainText(sql)
 		self.plaintext_attachment_nodeid_status.setPlainText(u"有%d个主题的Node ID发生了改变。" % nnid)
 		self.g_sql_update_nodeid = sql
